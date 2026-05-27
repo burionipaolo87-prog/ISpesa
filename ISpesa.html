@@ -374,14 +374,59 @@ function refreshCameraUI() {
   flashBtn.classList.toggle('on', torchOn);
   flashBtn.textContent = torchOn ? '🔦 Flash ON' : '🔦 Flash';
   if (cameraOn && torchSupported) {
-    cameraStatus.textContent = 'Fotocamera attiva. Puoi accendere il flash se serve.';
+    cameraStatus.textContent = 'Fotocamera attiva in alta qualità. Puoi accendere il flash se serve.';
   } else if (cameraOn) {
-    cameraStatus.textContent = 'Fotocamera attiva. Flash non supportato da questo browser/dispositivo.';
+    cameraStatus.textContent = 'Fotocamera attiva in alta qualità. Flash non supportato da questo browser/dispositivo.';
   } else if (photoLoaded) {
     cameraStatus.textContent = 'Foto caricata. Premi “Scatta e rileva” per leggere il prezzo.';
   } else {
-    cameraStatus.textContent = 'Fotocamera spenta. Se la camera live non parte, iPhone aprirà lo scatto foto.';
+    cameraStatus.textContent = 'Fotocamera spenta. Avvicina il cartellino alla cornice; se la camera live non parte, iPhone aprirà lo scatto foto.';
   }
+}
+
+
+function supportsConstraintValue(capabilities, key, value) {
+  if (!capabilities || !(key in capabilities)) return false;
+  const cap = capabilities[key];
+  if (Array.isArray(cap)) return cap.includes(value);
+  return !!cap;
+}
+
+async function applyBestCameraSettings(track) {
+  if (!track || typeof track.applyConstraints !== 'function') return;
+  let capabilities = {};
+  try {
+    capabilities = typeof track.getCapabilities === 'function' ? track.getCapabilities() : {};
+  } catch(e) {
+    capabilities = {};
+  }
+
+  const advanced = [];
+
+  if (supportsConstraintValue(capabilities, 'focusMode', 'continuous')) {
+    advanced.push({ focusMode: 'continuous' });
+  }
+  if (supportsConstraintValue(capabilities, 'exposureMode', 'continuous')) {
+    advanced.push({ exposureMode: 'continuous' });
+  }
+  if (supportsConstraintValue(capabilities, 'whiteBalanceMode', 'continuous')) {
+    advanced.push({ whiteBalanceMode: 'continuous' });
+  }
+
+  // Zoom leggero: spesso aiuta a riempire la cornice con il cartellino.
+  // Viene applicato solo se il browser lo supporta.
+  if (capabilities.zoom && typeof capabilities.zoom.min === 'number' && typeof capabilities.zoom.max === 'number') {
+    const targetZoom = Math.min(capabilities.zoom.max, Math.max(capabilities.zoom.min, 1.4));
+    advanced.push({ zoom: targetZoom });
+  }
+
+  if (advanced.length) {
+    try { await track.applyConstraints({ advanced }); } catch(e) {}
+  }
+}
+
+function waitForCameraFocus(ms = 650) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 async function startCamera() {
@@ -400,13 +445,19 @@ async function startCamera() {
     const stream = await navigator.mediaDevices.getUserMedia({
       video: {
         facingMode: { ideal: 'environment' },
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+        aspectRatio: { ideal: 16 / 9 },
+        frameRate: { ideal: 30, max: 30 },
+        focusMode: { ideal: 'continuous' },
+        exposureMode: { ideal: 'continuous' },
+        whiteBalanceMode: { ideal: 'continuous' }
       },
       audio: false
     });
     cameraStream = stream;
     videoTrack = stream.getVideoTracks()[0] || null;
+    await applyBestCameraSettings(videoTrack);
     video.dataset.photoLoaded = '0';
     video.removeAttribute('poster');
     video.srcObject = stream;
@@ -756,6 +807,10 @@ document.getElementById('btn-scan').addEventListener('click', async () => {
   loadingOcr.style.display = 'block';
   loadingOcr.textContent = '⏳ Rilevamento in corso...';
   scanResult.style.display = 'none';
+  if (cameraStream) {
+    loadingOcr.textContent = '⏳ Messa a fuoco...';
+    await waitForCameraFocus(700);
+  }
   if (video.dataset.photoLoaded === '1' && video.poster) {
     const img = new Image();
     img.src = video.poster;
