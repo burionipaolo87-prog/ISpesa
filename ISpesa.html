@@ -68,6 +68,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 .qty-display { min-width: 56px; text-align: center; font-size: 18px; font-weight: 700; color: #1a1a1a; }
 .price-input { width: 100%; min-width: 0; border: 1px solid rgba(0,0,0,0.15); border-radius: 8px; padding: 9px 8px; font-size: 17px; font-weight: 500; text-align: center; background: #fff; color: #1a1a1a; -webkit-appearance: none; }
 .scan-total { font-size: 13px; color: #666; text-align: center; margin-top: 6px; }
+.price-check { font-size: 12px; color: #856404; background: #fff8df; border: 1px solid #ffe08a; border-radius: 8px; padding: 8px; margin-top: 8px; line-height: 1.35; }
+.price-keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-top: 9px; }
+.price-key { border: 1px solid rgba(0,0,0,0.12); background: #fff; border-radius: 10px; min-height: 40px; font-size: 17px; font-weight: 700; color: #1a1a1a; cursor: pointer; }
+.price-key:active { background: #eee; }
+.price-key.wide { grid-column: span 2; }
+.price-key.clear { color: #dc3545; }
 .btn-add { width: 92px; padding: 10px 8px; border-radius: 8px; border: none; background: #1D9E75; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; }
 .btn-add:active { background: #178a63; }
 
@@ -162,6 +168,21 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
       <button class="btn-pm" id="btn-plus">+</button>
     </div>
     <div class="scan-total" id="scan-total">Totale: €0,00</div>
+    <div class="price-check" id="price-check" style="display:none;">Prezzo letto automaticamente: controllalo prima di aggiungere.</div>
+    <div class="price-keypad" id="price-keypad">
+      <button class="price-key" data-key="1">1</button>
+      <button class="price-key" data-key="2">2</button>
+      <button class="price-key" data-key="3">3</button>
+      <button class="price-key" data-key="4">4</button>
+      <button class="price-key" data-key="5">5</button>
+      <button class="price-key" data-key="6">6</button>
+      <button class="price-key" data-key="7">7</button>
+      <button class="price-key" data-key="8">8</button>
+      <button class="price-key" data-key="9">9</button>
+      <button class="price-key clear" data-key="clear">C</button>
+      <button class="price-key" data-key="0">0</button>
+      <button class="price-key" data-key="back">⌫</button>
+    </div>
   </div>
 
   <div class="list-section">
@@ -454,7 +475,16 @@ async function toggleFlash() {
 
 async function initWorker() {
   if (worker) return;
-  try { worker = await Tesseract.createWorker('ita+eng'); } catch(e) { worker = null; }
+  try {
+    worker = await Tesseract.createWorker('eng');
+    if (worker && typeof worker.setParameters === 'function') {
+      await worker.setParameters({
+        tessedit_char_whitelist: '0123456789,.€ ',
+        preserve_interword_spaces: '1',
+        tessedit_pageseg_mode: '6'
+      });
+    }
+  } catch(e) { worker = null; }
 }
 
 function normalizeOcrToken(text) {
@@ -664,6 +694,25 @@ function extractName(text) {
   return words.filter(w => w.length > 1).slice(0, 3).join(' ');
 }
 
+function priceToCents(value) {
+  const n = parseMoney(value);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.round(n * 100);
+}
+
+function setPriceCents(cents) {
+  cents = Math.max(0, Math.min(999999, parseInt(cents || 0, 10)));
+  scanPrice.value = (cents / 100).toFixed(2);
+  updateScanTotal();
+}
+
+function showPriceCheck(show, message) {
+  const el = document.getElementById('price-check');
+  if (!el) return;
+  el.style.display = show ? 'block' : 'none';
+  if (message) el.textContent = message;
+}
+
 function updateScanTotal() {
   const unit = parseMoney(scanPrice.value) || 0;
   scanTotal.textContent = 'Totale: ' + fmt(unit * currentScanQty);
@@ -685,6 +734,18 @@ cameraFileInput.addEventListener('change', () => {
   video.style.display = 'block';
   cameraFileInput.value = '';
   refreshCameraUI();
+});
+
+document.querySelectorAll('.price-key').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const key = btn.dataset.key;
+    let cents = priceToCents(scanPrice.value);
+    if (key === 'clear') cents = 0;
+    else if (key === 'back') cents = Math.floor(cents / 10);
+    else cents = Math.min(999999, cents * 10 + parseInt(key, 10));
+    setPriceCents(cents);
+    showPriceCheck(false);
+  });
 });
 
 cameraToggleBtn.addEventListener('click', toggleCamera);
@@ -736,6 +797,11 @@ document.getElementById('btn-scan').addEventListener('click', async () => {
     scanPrice.value = p ? p.toFixed(2) : '';
     resetScanQuantity();
     scanResult.style.display = 'block';
+    if (p) {
+      showPriceCheck(true, 'Prezzo suggerito dall’OCR: controllalo. Se è sbagliato, usa il tastierino qui sotto.');
+      scanPrice.focus();
+      scanPrice.select();
+    }
     if (!p) {
       loadingOcr.textContent = '⚠️ Prezzo non trovato: centra il cartellino nella cornice o usa + Manuale';
       setTimeout(() => { loadingOcr.style.display = 'none'; loadingOcr.textContent = '⏳ Rilevamento in corso...'; }, 1800);
@@ -745,6 +811,7 @@ document.getElementById('btn-scan').addEventListener('click', async () => {
     scanName.value = 'Prodotto';
     scanPrice.value = '';
     resetScanQuantity();
+    showPriceCheck(true, 'Prezzo non letto bene: inseriscilo con il tastierino.');
     scanResult.style.display = 'block';
   }
   loadingOcr.style.display = 'none';
@@ -768,6 +835,7 @@ document.getElementById('btn-add').addEventListener('click', () => {
   items.push({ name, price, qty: currentScanQty });
   scanResult.style.display = 'none';
   scanName.value = ''; scanPrice.value = '';
+  showPriceCheck(false);
   resetScanQuantity();
   updateUI();
 });
