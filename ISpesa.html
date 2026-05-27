@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+<meta name="apple-mobile-web-app-title" content="ISpesa"/>
+<link rel="apple-touch-icon" href="data:image/png;base64,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"/>
+<title>ISpesa</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif; background: #fff; }
+#app { min-height: 100vh; transition: background 0.4s; }
+#app.ok { background: #ffffff; }
+#app.warn { background: #FFF3CD; }
+#app.danger { background: #FDEDED; }
+
+.header { padding: 16px 16px 12px; border-bottom: 0.5px solid rgba(0,0,0,0.12); display: flex; align-items: center; justify-content: space-between; }
+.app-brand { display: flex; flex-direction: column; align-items: center; }
+.app-title { font-size: 20px; font-weight: 700; color: #1D9E75; letter-spacing: -0.5px; }
+.budget-remaining { font-size: 34px; font-weight: 300; color: #1a1a1a; line-height: 1; margin-top: 2px; }
+.budget-label { font-size: 11px; color: #888; margin-top: 2px; }
+.budget-spent { font-size: 12px; color: #888; margin-top: 3px; }
+
+.progress-bar { height: 4px; background: rgba(0,0,0,0.08); margin: 0; overflow: hidden; }
+.progress-fill { height: 100%; transition: width 0.3s, background 0.3s; }
+
+.status-banner { text-align: center; padding: 7px; font-size: 13px; font-weight: 600; }
+.status-warn { background: #FFF3CD; color: #856404; }
+.status-danger { background: #FDEDED; color: #842029; }
+
+.camera-section { padding: 12px 16px 8px; }
+#video { width: 100%; border-radius: 12px; background: #111; display: block; max-height: 210px; object-fit: cover; }
+#canvas { display: none; }
+.cam-controls { display: flex; gap: 8px; margin-top: 8px; }
+.btn-scan { flex: 1; padding: 13px; border-radius: 12px; border: none; background: #1D9E75; color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.btn-scan:active { background: #178a63; }
+.btn-manual-sm { padding: 13px 15px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.15); background: #f5f5f5; color: #333; font-size: 14px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+.btn-manual-sm:active { background: #e8e8e8; }
+
+#loading-ocr { display: none; font-size: 13px; color: #888; text-align: center; padding: 8px 0 4px; }
+
+.scan-result { margin: 8px 16px; background: #f9f9f9; border-radius: 12px; border: 1px solid rgba(0,0,0,0.08); padding: 12px; }
+.scan-result-label { font-size: 11px; color: #aaa; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 10px; }
+.scan-name { width: 100%; border: 1px solid rgba(0,0,0,0.15); border-radius: 8px; padding: 9px 12px; font-size: 15px; background: #fff; color: #1a1a1a; -webkit-appearance: none; }
+.price-row { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+.btn-pm { width: 38px; height: 38px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.15); background: #fff; font-size: 20px; font-weight: 400; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #333; flex-shrink: 0; }
+.btn-pm:active { background: #eee; }
+.price-input { flex: 1; border: 1px solid rgba(0,0,0,0.15); border-radius: 8px; padding: 9px 8px; font-size: 17px; font-weight: 500; text-align: center; background: #fff; color: #1a1a1a; -webkit-appearance: none; }
+.btn-add { flex: 1; padding: 10px 12px; border-radius: 8px; border: none; background: #1D9E75; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; }
+.btn-add:active { background: #178a63; }
+
+.list-section { padding: 0 16px 100px; }
+.list-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 0 6px; border-bottom: 0.5px solid rgba(0,0,0,0.1); margin-bottom: 2px; }
+.list-title { font-size: 13px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.05em; }
+.btn-clear { font-size: 13px; color: #1D9E75; background: none; border: none; cursor: pointer; padding: 4px; font-weight: 500; }
+.item-row { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-bottom: 0.5px solid rgba(0,0,0,0.07); }
+.item-name { flex: 1; font-size: 15px; color: #1a1a1a; }
+.item-price { font-size: 15px; font-weight: 600; color: #1a1a1a; }
+.item-del { background: none; border: none; color: #bbb; cursor: pointer; padding: 4px; font-size: 18px; line-height: 1; }
+.empty-list { text-align: center; padding: 32px 0; color: #bbb; font-size: 15px; }
+
+.modal-wrap { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.45); z-index: 100; align-items: center; justify-content: center; }
+.modal-wrap.open { display: flex; }
+.modal { background: #fff; border-radius: 16px; padding: 22px; width: 290px; }
+.modal h3 { font-size: 17px; font-weight: 600; margin-bottom: 16px; color: #1a1a1a; }
+.modal input { width: 100%; border: 1px solid rgba(0,0,0,0.15); border-radius: 10px; padding: 11px 12px; font-size: 16px; margin-bottom: 14px; background: #f5f5f5; color: #1a1a1a; -webkit-appearance: none; }
+.modal-btns { display: flex; gap: 8px; }
+.modal-btns button { flex: 1; padding: 11px; border-radius: 10px; font-size: 15px; cursor: pointer; font-weight: 500; }
+.btn-cancel { border: 1px solid rgba(0,0,0,0.15); background: #f5f5f5; color: #333; }
+.btn-confirm { border: none; background: #1D9E75; color: #fff; font-weight: 600; }
+.btn-confirm:active { background: #178a63; }
+
+.settings-btn { padding: 8px 12px; border-radius: 10px; border: 1px solid rgba(0,0,0,0.12); background: #f5f5f5; color: #555; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 5px; }
+
+.info-btn { width: 38px; height: 38px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.12); background: #f5f5f5; color: #1D9E75; font-size: 18px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.info-btn:active { background: #e8e8e8; }
+.info-text { font-size: 15px; line-height: 1.55; color: #333; text-align: center; margin: 2px 0 18px; }
+.info-title { font-size: 20px; font-weight: 700; color: #1D9E75; text-align: center; margin-bottom: 8px; }
+.info-note { font-size: 12px; line-height: 1.45; color: #888; text-align: center; margin-top: 10px; }
+</style>
+</head>
+<body>
+<div id="app" class="ok">
+
+  <div class="header">
+    <button class="settings-btn" id="btn-settings">
+      ⚙️ Budget
+    </button>
+    <div class="app-brand">
+      <div class="app-title">ISpesa</div>
+      <div class="budget-remaining" id="remaining">€50,00</div>
+      <div class="budget-label">disponibili</div>
+      <div class="budget-spent" id="spent-label">spesi €0,00 di €50,00</div>
+    </div>
+    <button class="info-btn" id="btn-info" aria-label="Informazioni">ⓘ</button>
+  </div>
+
+  <div class="progress-bar">
+    <div class="progress-fill" id="progress" style="width:0%;background:#1D9E75;"></div>
+  </div>
+
+  <div id="status-banner" style="display:none;"></div>
+
+  <div class="camera-section">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="canvas"></canvas>
+    <div class="cam-controls">
+      <button class="btn-scan" id="btn-scan">📷 Scatta e rileva</button>
+      <button class="btn-manual-sm" id="btn-manual-add">+ Manuale</button>
+    </div>
+    <div id="loading-ocr">⏳ Rilevamento in corso...</div>
+  </div>
+
+  <div class="scan-result" id="scan-result" style="display:none;">
+    <div class="scan-result-label">Prodotto rilevato</div>
+    <input class="scan-name" type="text" id="scan-name" placeholder="Nome prodotto"/>
+    <div class="price-row">
+      <button class="btn-pm" id="btn-minus">−</button>
+      <input class="price-input" type="number" id="scan-price" step="0.01" min="0" placeholder="0.00" inputmode="decimal"/>
+      <button class="btn-pm" id="btn-plus">+</button>
+      <button class="btn-add" id="btn-add">Aggiungi</button>
+    </div>
+  </div>
+
+  <div class="list-section">
+    <div class="list-header">
+      <span class="list-title">Carrello</span>
+      <button class="btn-clear" id="btn-clear">Svuota tutto</button>
+    </div>
+    <div id="item-list"><div class="empty-list">Nessun prodotto aggiunto</div></div>
+  </div>
+
+  <div class="modal-wrap" id="modal-budget">
+    <div class="modal">
+      <h3>Imposta budget massimo</h3>
+      <input type="number" id="modal-budget-input" step="0.01" min="1" placeholder="50.00" inputmode="decimal"/>
+      <div class="modal-btns">
+        <button class="btn-cancel" id="modal-cancel">Annulla</button>
+        <button class="btn-confirm" id="modal-confirm">Conferma</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-wrap" id="modal-manual">
+    <div class="modal">
+      <h3>Aggiungi manualmente</h3>
+      <input type="text" id="manual-name" placeholder="Nome prodotto"/>
+      <input type="number" id="manual-price" step="0.01" min="0" placeholder="Prezzo €" inputmode="decimal"/>
+      <div class="modal-btns">
+        <button class="btn-cancel" id="manual-cancel">Annulla</button>
+        <button class="btn-confirm" id="manual-confirm">Aggiungi</button>
+      </div>
+    </div>
+  </div>
+
+
+  <div class="modal-wrap" id="modal-info">
+    <div class="modal">
+      <div class="info-title">ISpesa</div>
+      <div class="info-text">
+        <strong>Creato da M.G.74 · © 2026</strong>
+      </div>
+      <div class="info-note">
+        Applicazione per il controllo del budget durante la spesa.<br>
+        Il carrello viene salvato localmente su questo dispositivo.
+      </div>
+      <div class="modal-btns" style="margin-top:18px;">
+        <button class="btn-confirm" id="info-close">OK</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js"></script>
+<script>
+let budget = 50, items = [], worker = null;
+const app = document.getElementById('app');
+const remainingEl = document.getElementById('remaining');
+const spentLabel = document.getElementById('spent-label');
+const progressEl = document.getElementById('progress');
+const statusBanner = document.getElementById('status-banner');
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const scanResult = document.getElementById('scan-result');
+const scanName = document.getElementById('scan-name');
+const scanPrice = document.getElementById('scan-price');
+const itemList = document.getElementById('item-list');
+const loadingOcr = document.getElementById('loading-ocr');
+const STORAGE_KEY = 'ispesa_dati_v1';
+
+function parseMoney(value) {
+  if (value === null || value === undefined) return NaN;
+  return parseFloat(String(value).replace(',', '.'));
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function saveData() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ budget, items })); } catch(e) {}
+}
+
+function loadData() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    if (typeof saved.budget === 'number' && saved.budget > 0) budget = saved.budget;
+    if (Array.isArray(saved.items)) {
+      items = saved.items
+        .filter(i => i && typeof i.name === 'string' && typeof i.price === 'number' && i.price > 0)
+        .map(i => ({ name: i.name, price: i.price }));
+    }
+  } catch(e) {}
+}
+
+function fmt(n) { return '€' + n.toFixed(2).replace('.', ','); }
+
+function updateUI() {
+  const spent = items.reduce((s, i) => s + i.price, 0);
+  const remaining = budget - spent;
+  const pct = Math.min((spent / budget) * 100, 100);
+  remainingEl.textContent = fmt(Math.max(remaining, 0));
+  spentLabel.textContent = 'spesi ' + fmt(spent) + ' di ' + fmt(budget);
+  progressEl.style.width = pct + '%';
+  if (remaining < 0) {
+    app.className = 'danger';
+    progressEl.style.background = '#dc3545';
+    statusBanner.style.display = 'block';
+    statusBanner.className = 'status-banner status-danger';
+    statusBanner.textContent = '⚠️ Budget superato di ' + fmt(Math.abs(remaining));
+  } else if (remaining <= 5) {
+    app.className = 'warn';
+    progressEl.style.background = '#ffc107';
+    statusBanner.style.display = 'block';
+    statusBanner.className = 'status-banner status-warn';
+    statusBanner.textContent = '⚠️ Attenzione: meno di €5 rimanenti';
+  } else {
+    app.className = 'ok';
+    progressEl.style.background = '#1D9E75';
+    statusBanner.style.display = 'none';
+  }
+  renderList();
+  saveData();
+}
+
+function renderList() {
+  if (items.length === 0) { itemList.innerHTML = '<div class="empty-list">Nessun prodotto aggiunto</div>'; return; }
+  itemList.innerHTML = items.map((item, i) => `
+    <div class="item-row">
+      <span class="item-name">${escapeHtml(item.name)}</span>
+      <span class="item-price">${fmt(item.price)}</span>
+      <button class="item-del" onclick="removeItem(${i})" aria-label="Rimuovi">✕</button>
+    </div>`).join('');
+}
+
+window.removeItem = function(i) { items.splice(i, 1); updateUI(); };
+
+async function startCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } });
+    video.srcObject = stream;
+  } catch(e) {
+    video.style.display = 'none';
+    document.querySelector('.cam-controls').style.marginTop = '0';
+  }
+}
+
+async function initWorker() {
+  if (worker) return;
+  try { worker = await Tesseract.createWorker('ita+eng'); } catch(e) { worker = null; }
+}
+
+function extractPrice(text) {
+  const patterns = [/€\s*(\d+[.,]\d{2})/, /(\d+[.,]\d{2})\s*€/, /(\d{1,3}[.,]\d{2})/];
+  for (const p of patterns) { const m = text.match(p); if (m) return parseFloat(m[1].replace(',', '.')); }
+  return null;
+}
+
+function extractName(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 2 && !/^\d/.test(l) && !/^[€$£]/.test(l) && !/^\W+$/.test(l));
+  if (lines.length === 0) return '';
+  let best = lines[0];
+  for (const line of lines) {
+    if (line.length > 3 && line.length < 50 && /[a-zA-ZàèéìòùÀÈÉÌÒÙ]{3}/.test(line)) { best = line; break; }
+  }
+  const words = best.replace(/[^a-zA-ZàèéìòùÀÈÉÌÒÙ\s]/g, ' ').trim().split(/\s+/);
+  return words.filter(w => w.length > 1).slice(0, 3).join(' ');
+}
+
+document.getElementById('btn-scan').addEventListener('click', async () => {
+  if (!video.srcObject) { alert('Fotocamera non disponibile. Usa il tasto + Manuale.'); return; }
+  loadingOcr.style.display = 'block';
+  scanResult.style.display = 'none';
+  canvas.width = video.videoWidth || 640;
+  canvas.height = video.videoHeight || 480;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  await initWorker();
+  try {
+    const result = await worker.recognize(canvas.toDataURL('image/jpeg', 0.92));
+    const text = result.data.text;
+    scanName.value = extractName(text) || 'Prodotto';
+    const p = extractPrice(text);
+    scanPrice.value = p ? p.toFixed(2) : '';
+    scanResult.style.display = 'block';
+  } catch(e) {
+    scanName.value = 'Prodotto'; scanPrice.value = ''; scanResult.style.display = 'block';
+  }
+  loadingOcr.style.display = 'none';
+});
+
+document.getElementById('btn-minus').addEventListener('click', () => {
+  const v = parseFloat(scanPrice.value) || 0;
+  scanPrice.value = Math.max(0, Math.round((v - 0.10) * 100) / 100).toFixed(2);
+});
+document.getElementById('btn-plus').addEventListener('click', () => {
+  const v = parseFloat(scanPrice.value) || 0;
+  scanPrice.value = (Math.round((v + 0.10) * 100) / 100).toFixed(2);
+});
+
+document.getElementById('btn-add').addEventListener('click', () => {
+  const name = scanName.value.trim() || 'Prodotto';
+  const price = parseMoney(scanPrice.value);
+  if (!price || price <= 0) { scanPrice.focus(); return; }
+  items.push({ name, price });
+  scanResult.style.display = 'none';
+  scanName.value = ''; scanPrice.value = '';
+  updateUI();
+});
+
+document.getElementById('btn-settings').addEventListener('click', () => {
+  document.getElementById('modal-budget-input').value = budget.toFixed(2);
+  document.getElementById('modal-budget').classList.add('open');
+});
+document.getElementById('modal-cancel').addEventListener('click', () => document.getElementById('modal-budget').classList.remove('open'));
+document.getElementById('modal-confirm').addEventListener('click', () => {
+  const v = parseMoney(document.getElementById('modal-budget-input').value);
+  if (v > 0) { budget = v; updateUI(); }
+  document.getElementById('modal-budget').classList.remove('open');
+});
+
+document.getElementById('btn-manual-add').addEventListener('click', () => {
+  document.getElementById('manual-name').value = '';
+  document.getElementById('manual-price').value = '';
+  document.getElementById('modal-manual').classList.add('open');
+});
+document.getElementById('manual-cancel').addEventListener('click', () => document.getElementById('modal-manual').classList.remove('open'));
+document.getElementById('manual-confirm').addEventListener('click', () => {
+  const name = document.getElementById('manual-name').value.trim() || 'Prodotto';
+  const price = parseMoney(document.getElementById('manual-price').value);
+  if (price > 0) { items.push({ name, price }); updateUI(); }
+  document.getElementById('modal-manual').classList.remove('open');
+});
+
+document.getElementById('btn-clear').addEventListener('click', () => { if (items.length === 0) return; if (confirm('Svuotare il carrello?')) { items = []; updateUI(); } });
+
+document.getElementById('btn-info').addEventListener('click', () => document.getElementById('modal-info').classList.add('open'));
+document.getElementById('info-close').addEventListener('click', () => document.getElementById('modal-info').classList.remove('open'));
+document.getElementById('modal-info').addEventListener('click', (e) => { if (e.target.id === 'modal-info') e.currentTarget.classList.remove('open'); });
+
+loadData();
+
+startCamera();
+updateUI();
+</script>
+</body>
+</html>
