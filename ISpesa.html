@@ -138,6 +138,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
       <div class="guide-label">Inquadra qui il prezzo</div>
     </div>
     <canvas id="canvas"></canvas>
+    <input id="camera-file-input" type="file" accept="image/*" capture="environment" style="display:none;">
     <div class="cam-controls">
       <button class="btn-camera" id="btn-camera-toggle">📷 Camera ON</button>
       <button class="btn-flash" id="btn-flash" disabled>🔦 Flash</button>
@@ -238,6 +239,7 @@ const cameraToggleBtn = document.getElementById('btn-camera-toggle');
 const flashBtn = document.getElementById('btn-flash');
 const scanBtn = document.getElementById('btn-scan');
 const cameraStatus = document.getElementById('camera-status');
+const cameraFileInput = document.getElementById('camera-file-input');
 const STORAGE_KEY = 'ispesa_dati_v1';
 
 function parseMoney(value) {
@@ -343,31 +345,49 @@ window.removeItem = function(i) {
 
 function refreshCameraUI() {
   const cameraOn = !!cameraStream;
-  cameraToggleBtn.textContent = cameraOn ? '⏹ Camera OFF' : '📷 Camera ON';
+  const photoLoaded = video.dataset.photoLoaded === '1';
+  cameraToggleBtn.textContent = cameraOn ? '⏹ Camera OFF' : (photoLoaded ? '🔁 Nuova foto' : '📷 Camera ON');
   cameraToggleBtn.classList.toggle('off', cameraOn);
-  scanBtn.disabled = !cameraOn;
+  scanBtn.disabled = !cameraOn && !photoLoaded;
   flashBtn.disabled = !cameraOn || !torchSupported;
   flashBtn.classList.toggle('on', torchOn);
   flashBtn.textContent = torchOn ? '🔦 Flash ON' : '🔦 Flash';
-  if (!cameraOn) {
-    cameraStatus.textContent = 'Fotocamera spenta. Attivala solo quando ti serve.';
-  } else if (torchSupported) {
+  if (cameraOn && torchSupported) {
     cameraStatus.textContent = 'Fotocamera attiva. Puoi accendere il flash se serve.';
-  } else {
+  } else if (cameraOn) {
     cameraStatus.textContent = 'Fotocamera attiva. Flash non supportato da questo browser/dispositivo.';
+  } else if (photoLoaded) {
+    cameraStatus.textContent = 'Foto caricata. Premi “Scatta e rileva” per leggere il prezzo.';
+  } else {
+    cameraStatus.textContent = 'Fotocamera spenta. Se la camera live non parte, iPhone aprirà lo scatto foto.';
   }
 }
 
 async function startCamera() {
   if (cameraStream) return;
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    cameraStatus.textContent = 'Fotocamera non supportata. Usa il tasto + Manuale.';
+
+  // Su iPhone, se l'HTML è aperto come file locale o in contesto non sicuro,
+  // getUserMedia può essere bloccato. In quel caso apriamo la fotocamera
+  // tramite input capture: è meno “live”, ma funziona anche in molti casi locali.
+  if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    cameraStatus.textContent = 'Camera live non disponibile qui. Scatta una foto del prezzo.';
+    cameraFileInput.click();
     return;
   }
+
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } });
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: 'environment' },
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      },
+      audio: false
+    });
     cameraStream = stream;
     videoTrack = stream.getVideoTracks()[0] || null;
+    video.dataset.photoLoaded = '0';
+    video.removeAttribute('poster');
     video.srcObject = stream;
     video.style.display = 'block';
     torchOn = false;
@@ -383,9 +403,10 @@ async function startCamera() {
     torchOn = false;
     torchSupported = false;
     video.srcObject = null;
-    video.style.display = 'none';
-    cameraStatus.textContent = 'Fotocamera non disponibile o permesso negato. Usa il tasto + Manuale.';
+    video.style.display = 'block';
+    cameraStatus.textContent = 'Permesso camera negato o camera live bloccata. Scatta una foto del prezzo.';
     refreshCameraUI();
+    setTimeout(() => cameraFileInput.click(), 150);
   }
 }
 
@@ -401,14 +422,19 @@ async function stopCamera() {
   torchOn = false;
   torchSupported = false;
   video.srcObject = null;
-  video.style.display = 'none';
+  video.removeAttribute('poster');
+  video.dataset.photoLoaded = '0';
+  video.style.display = 'block';
   loadingOcr.style.display = 'none';
   refreshCameraUI();
 }
 
 async function toggleCamera() {
-  if (cameraStream) await stopCamera();
-  else await startCamera();
+  if (cameraStream) {
+    await stopCamera();
+  } else {
+    await startCamera();
+  }
 }
 
 async function toggleFlash() {
@@ -649,17 +675,41 @@ function resetScanQuantity() {
   updateScanTotal();
 }
 
+cameraFileInput.addEventListener('change', () => {
+  const file = cameraFileInput.files && cameraFileInput.files[0];
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  video.srcObject = null;
+  video.poster = url;
+  video.dataset.photoLoaded = '1';
+  video.style.display = 'block';
+  cameraFileInput.value = '';
+  refreshCameraUI();
+});
+
 cameraToggleBtn.addEventListener('click', toggleCamera);
 flashBtn.addEventListener('click', toggleFlash);
 
 document.getElementById('btn-scan').addEventListener('click', async () => {
-  if (!cameraStream || !video.srcObject) { alert('Attiva prima la fotocamera oppure usa il tasto + Manuale.'); return; }
+  if (!cameraStream && video.dataset.photoLoaded !== '1') { alert('Attiva la fotocamera, scatta una foto del prezzo oppure usa il tasto + Manuale.'); return; }
   loadingOcr.style.display = 'block';
   loadingOcr.textContent = '⏳ Rilevamento in corso...';
   scanResult.style.display = 'none';
-  canvas.width = video.videoWidth || 640;
-  canvas.height = video.videoHeight || 480;
-  canvas.getContext('2d').drawImage(video, 0, 0);
+  if (video.dataset.photoLoaded === '1' && video.poster) {
+    const img = new Image();
+    img.src = video.poster;
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = reject;
+    });
+    canvas.width = img.naturalWidth || img.width || 640;
+    canvas.height = img.naturalHeight || img.height || 480;
+    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+  } else {
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+  }
   await initWorker();
   if (!worker) {
     loadingOcr.style.display = 'none';
