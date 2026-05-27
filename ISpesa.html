@@ -680,8 +680,7 @@ document.getElementById('btn-scan').addEventListener('click', async () => {
       const result = await worker.recognize(allVariants[i].canvas.toDataURL('image/jpeg', 0.96));
       results.push({ name: allVariants[i].name, result });
     }
-    const nameText = results.map(r => r.result?.data?.text || '').join('
-');
+    const nameText = results.map(r => r.result?.data?.text || '').join('\\n');
     scanName.value = extractName(nameText) || 'Prodotto';
     const p = extractPrice(results);
     scanPrice.value = p ? p.toFixed(2) : '';
