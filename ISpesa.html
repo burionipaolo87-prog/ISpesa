@@ -267,7 +267,7 @@ const STORAGE_KEY = 'ispesa_dati_v1';
 // Non condividere questo file se contiene la chiave.
 const USE_OPENAI_OCR = true;
 const OPENAI_API_KEY = 'sk-proj-MtezwJ-HQ2yoUrxu6tGQT6Fmdu_Dx2FZkTqO1K2QxyNkVx5Lwhf9tuAV_VtQC9dfg5weflXWqAT3BlbkFJMMXP0QOYApxCu0aAbft_xADAvjL5WQNouwTvRufy1m6I5Y7QrWAsFXP-KCMWmVqbomY7O17dMA';
-const OPENAI_OCR_MODEL = 'gpt-4.1-mini';
+const OPENAI_OCR_MODEL = 'gpt-4.1'; // più preciso di gpt-4.1-mini sui cartellini prezzo
 
 function parseMoney(value) {
   if (value === null || value === undefined) return NaN;
@@ -574,12 +574,28 @@ function parseJsonFromModelText(text) {
   return JSON.parse(cleaned);
 }
 
-async function openAiPriceOcr(sourceCanvas) {
+function makeResizedJpegDataUrl(sourceCanvas, maxSide = 1800, quality = 0.94) {
+  const scale = Math.min(1, maxSide / Math.max(sourceCanvas.width || 1, sourceCanvas.height || 1));
+  const w = Math.max(1, Math.round((sourceCanvas.width || 1) * scale));
+  const h = Math.max(1, Math.round((sourceCanvas.height || 1) * scale));
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(sourceCanvas, 0, 0, w, h);
+  return c.toDataURL('image/jpeg', quality);
+}
+
+async function openAiPriceOcr(sourceCanvas, fullCanvas) {
   if (!USE_OPENAI_OCR || !OPENAI_API_KEY || OPENAI_API_KEY === 'INSERISCI_QUI_LA_TUA_API_KEY') {
     throw new Error('Chiave OpenAI non configurata');
   }
 
-  const imageUrl = sourceCanvas.toDataURL('image/jpeg', 0.88);
+  // Inviamo DUE immagini: prima il ritaglio della cornice, poi la foto intera.
+  // Questo evita il problema più comune: la cornice non centra perfettamente il prezzo.
+  const cropImageUrl = makeResizedJpegDataUrl(sourceCanvas, 1800, 0.95);
+  const fullImageUrl = makeResizedJpegDataUrl(fullCanvas || sourceCanvas, 1800, 0.92);
+
   const response = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: {
@@ -595,11 +611,17 @@ async function openAiPriceOcr(sourceCanvas) {
           content: [
             {
               type: 'input_text',
-              text: 'Analizza questa foto di un cartellino prezzo da supermercato italiano. Restituisci solo JSON valido, senza markdown e senza testo extra, nel formato {"name":"nome prodotto o Prodotto","price":1.23,"confidence":0.0}. Scegli il prezzo principale da pagare. Ignora prezzo al kg, codici, date, punti fedelta, percentuali di sconto e prezzi barrati. Usa il punto come separatore decimale. Se il prezzo non è leggibile usa price:null e confidence:0.'
+              text: 'Sei un lettore di cartellini prezzo da supermercato italiano. Ricevi due immagini dello stesso cartellino: 1) ritaglio centrale, 2) foto intera. Leggi il PREZZO PRINCIPALE DA PAGARE. Restituisci SOLO JSON valido: {"name":"nome prodotto o Prodotto","price":1.23,"confidence":0.0,"seen":"testo/prezzo letto"}. Regole: ignora prezzo al kg o al litro, codici, date, punti fedelta, percentuali di sconto, prezzi barrati e numeri piccoli non associati al prezzo finale. Se vedi 1 e 99 come euro e centesimi, restituisci 1.99. Se non sei sicuro, scegli comunque il prezzo più probabile e abbassa confidence. Usa il punto come separatore decimale.'
             },
             {
               type: 'input_image',
-              image_url: imageUrl
+              image_url: cropImageUrl,
+              detail: 'high'
+            },
+            {
+              type: 'input_image',
+              image_url: fullImageUrl,
+              detail: 'high'
             }
           ]
         }
@@ -610,7 +632,7 @@ async function openAiPriceOcr(sourceCanvas) {
   if (!response.ok) {
     let details = '';
     try { details = await response.text(); } catch(e) {}
-    throw new Error('Errore OpenAI OCR ' + response.status + ' ' + details.slice(0, 180));
+    throw new Error('Errore OpenAI OCR ' + response.status + ' ' + details.slice(0, 260));
   }
 
   const data = await response.json();
@@ -621,7 +643,8 @@ async function openAiPriceOcr(sourceCanvas) {
   return {
     name: String(parsed.name || 'Prodotto').trim() || 'Prodotto',
     price: Number.isFinite(price) && price > 0 ? Math.round(price * 100) / 100 : null,
-    confidence: Number(parsed.confidence) || 0
+    confidence: Number(parsed.confidence) || 0,
+    seen: String(parsed.seen || '').trim()
   };
 }
 
@@ -917,14 +940,14 @@ document.getElementById('btn-scan').addEventListener('click', async () => {
     if (USE_OPENAI_OCR && OPENAI_API_KEY && OPENAI_API_KEY !== 'INSERISCI_QUI_LA_TUA_API_KEY') {
       loadingOcr.textContent = '⏳ OCR online OpenAI in corso...';
       const guidedCanvasOnline = captureGuideCanvas(canvas);
-      const online = await openAiPriceOcr(guidedCanvasOnline);
+      const online = await openAiPriceOcr(guidedCanvasOnline, canvas);
       scanName.value = online.name || 'Prodotto';
       scanPrice.value = online.price ? online.price.toFixed(2) : '';
       resetScanQuantity();
       scanResult.style.display = 'block';
       if (online.price) {
         const conf = online.confidence ? ' Affidabilità stimata: ' + Math.round(online.confidence * 100) + '%.' : '';
-        showPriceCheck(true, 'Prezzo suggerito dall’OCR online: controllalo prima di aggiungere.' + conf);
+        showPriceCheck(true, 'Prezzo suggerito dall’OCR online: controllalo prima di aggiungere.' + conf + (online.seen ? ' Letto: ' + online.seen : ''));
         loadingOcr.style.display = 'none';
         loadingOcr.textContent = '⏳ Rilevamento in corso...';
         scanPrice.focus();
@@ -935,7 +958,7 @@ document.getElementById('btn-scan').addEventListener('click', async () => {
     }
   } catch(e) {
     console.warn(e);
-    loadingOcr.textContent = '⏳ OCR online non riuscito, provo OCR locale...';
+    loadingOcr.textContent = '⚠️ OCR online fallito: ' + (e && e.message ? e.message.slice(0, 90) : 'errore') + '. Provo OCR locale...';
   }
 
   await initWorker();
