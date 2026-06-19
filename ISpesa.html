@@ -268,7 +268,7 @@ const STORAGE_KEY = 'ispesa_dati_v1';
 // Non condividere questo file se contiene la chiave.
 const USE_OPENAI_OCR = true;
 let OPENAI_API_KEY = localStorage.getItem('ispesa_openai_api_key_v1') || ''; // salvata solo localmente sul dispositivo
-const OPENAI_OCR_MODEL = 'gpt-4.1'; // più preciso di gpt-4.1-mini sui cartellini prezzo
+const OPENAI_OCR_MODEL = 'gpt-4o'; // modello visivo più adatto ai cartellini prezzo
 
 function ensureOpenAiApiKey() {
   if (OPENAI_API_KEY && OPENAI_API_KEY.trim().startsWith('sk-')) return true;
@@ -437,7 +437,7 @@ async function applyBestCameraSettings(track) {
   // Zoom leggero: spesso aiuta a riempire la cornice con il cartellino.
   // Viene applicato solo se il browser lo supporta.
   if (capabilities.zoom && typeof capabilities.zoom.min === 'number' && typeof capabilities.zoom.max === 'number') {
-    const targetZoom = Math.min(capabilities.zoom.max, Math.max(capabilities.zoom.min, 2.0));
+    const targetZoom = Math.min(capabilities.zoom.max, Math.max(capabilities.zoom.min, 1.0));
     advanced.push({ zoom: targetZoom });
   }
 
@@ -479,7 +479,7 @@ async function captureStillCanvas() {
   const vh = video.videoHeight || 720;
   const ew = Math.max(1, Math.round(video.clientWidth || video.offsetWidth || 360));
   const eh = Math.max(1, Math.round(video.clientHeight || video.offsetHeight || 210));
-  const outScale = 3;
+  const outScale = 4;
   const c = document.createElement('canvas');
   c.width = ew * outScale;
   c.height = eh * outScale;
@@ -647,6 +647,26 @@ function makeResizedJpegDataUrl(sourceCanvas, maxSide = 1800, quality = 0.94) {
   return c.toDataURL('image/jpeg', quality);
 }
 
+function makeHighContrastJpegDataUrl(sourceCanvas, maxSide = 2600, quality = 0.97) {
+  const scale = Math.min(1, maxSide / Math.max(sourceCanvas.width || 1, sourceCanvas.height || 1));
+  const w = Math.max(1, Math.round((sourceCanvas.width || 1) * scale));
+  const h = Math.max(1, Math.round((sourceCanvas.height || 1) * scale));
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(sourceCanvas, 0, 0, w, h);
+  const img = ctx.getImageData(0, 0, w, h);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    let gray = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
+    let v = Math.max(0, Math.min(255, (gray - 128) * 1.65 + 128));
+    d[i] = d[i + 1] = d[i + 2] = v;
+  }
+  ctx.putImageData(img, 0, 0);
+  return c.toDataURL('image/jpeg', quality);
+}
+
 async function openAiPriceOcr(sourceCanvas, fullCanvas) {
   if (!USE_OPENAI_OCR || !OPENAI_API_KEY || OPENAI_API_KEY === 'INSERISCI_QUI_LA_TUA_API_KEY' || OPENAI_API_KEY === 'chiave API') {
     throw new Error('Chiave OpenAI non configurata');
@@ -655,6 +675,7 @@ async function openAiPriceOcr(sourceCanvas, fullCanvas) {
   // Inviamo 2 immagini: 1) il ritaglio del box verde, 2) il frame intero visibile.
   // Il box è prioritario, il frame intero serve solo se il crop è leggermente fuori centro.
   const cropImageUrl = makeResizedJpegDataUrl(sourceCanvas, 2600, 0.97);
+  const cropContrastImageUrl = makeHighContrastJpegDataUrl(sourceCanvas, 2600, 0.97);
   const fullImageUrl = makeResizedJpegDataUrl(fullCanvas || sourceCanvas, 2600, 0.94);
 
   const response = await fetch('https://api.openai.com/v1/responses', {
@@ -672,11 +693,16 @@ async function openAiPriceOcr(sourceCanvas, fullCanvas) {
           content: [
             {
               type: 'input_text',
-              text: 'Sei un lettore di cartellini prezzo da supermercato. Ricevi due immagini: 1) ritaglio del box verde, 2) frame intero visibile. Devi leggere il PREZZO PRINCIPALE GRANDE da pagare. Restituisci SOLO JSON valido: {"name":"Prodotto","price":1.23,"confidence":0.0,"seen":"testo/prezzo letto"}. Regole fondamentali: il prezzo può essere scritto con euro grandi e centesimi separati, per esempio 6 e 90 significa 6.90; 2 e 50 significa 2.50; 1 e 99 significa 1.99. Ignora codici a barre, number/codice prodotto, date, quantità/peso tipo 350g, prezzo originale barrato o piccolo, prezzo/kg/litro, percentuali e promozioni. Se nell’immagine vedi un grande prezzo rosso o un numero molto grande, scegli quello. Non restituire null se un prezzo grande è visibile. Usa il punto come separatore decimale.'
+              text: 'Sei un lettore VISIVO di cartellini prezzo da supermercato. Ricevi immagini del cartellino dentro il box verde. Devi scegliere il PREZZO FINALE PRINCIPALE, cioè il numero grande che il cliente paga. Restituisci SOLO JSON valido: {"name":"Prodotto","price":1.23,"confidence":0.0,"seen":"prezzo letto"}. REGOLE: 1) I centesimi possono essere separati o piccoli in alto/destra: 6 90 = 6.90; 1 35 = 1.35; 1 39 = 1.39; 2 68 = 2.68; 2.49 = 2.49. 2) Se c’è un prezzo grande al kg come “€/kg 2,68” o “1 39 € al kg”, quello È il prezzo principale: non scartarlo. 3) Scarta solo i prezzi secondari piccoli: prezzo normale, prezzo originale, prezzo barrato, prezzo/kg piccolo quando esiste un altro prezzo grande finale, vecchi prezzi, sconti tipo -40%, date, QR, codice prodotto, barcode, grammi, kg, numero articolo. 4) Se c’è un prezzo rosso grande e un prezzo normale piccolo, scegli il prezzo rosso grande. 5) Se vedi 73 dentro “Tasto 73”, 40 dentro “-40%”, 350g, 108679 o date, NON sono prezzi. 6) Non inventare: se vedi chiaramente il prezzo grande, restituiscilo anche se è al kg. Esempi corretti: “CRACKER SALATI 1 35 € ... -40% ... €2.40/Kg” => 1.35; “Limoni ... prezzo normale 2.49 ... 1.79 ... -28%” => 1.79; “Funghi ... €/kg 2,68 ... Tasto 73” => 2.68; “Arance 1 39 € al kg” => 1.39; “6 90 promotion” => 6.90. Usa sempre il punto come separatore decimale.'
             },
             {
               type: 'input_image',
               image_url: cropImageUrl,
+              detail: 'high'
+            },
+            {
+              type: 'input_image',
+              image_url: cropContrastImageUrl,
               detail: 'high'
             },
             {
@@ -909,7 +935,7 @@ function makeCanvasVariant(sourceCanvas, mode) {
   return c;
 }
 
-// Cornice più stretta: un prezzo grande occupa poco spazio orizzontale.
+// Cornice molto larga: inviamo quasi tutto il cartellino dentro il box verde.
 const GUIDE_WIDTH_RATIO = 0.90;
 const GUIDE_HEIGHT_RATIO = 0.76;
 
@@ -1022,7 +1048,7 @@ document.getElementById('btn-scan').addEventListener('click', async () => {
   scanResult.style.display = 'none';
   if (cameraStream) {
     loadingOcr.textContent = '⏳ Leggo esattamente il box verde e invio a OpenAI...';
-    await waitForCameraFocus(350);
+    await waitForCameraFocus(900);
     const stillCanvas = await captureStillCanvas();
     canvas.width = stillCanvas.width;
     canvas.height = stillCanvas.height;
@@ -1056,11 +1082,19 @@ document.getElementById('btn-scan').addEventListener('click', async () => {
         scanPrice.select();
         return;
       }
-      showPriceCheck(true, 'OCR online non sicuro: inserisci il prezzo con il tastierino oppure riprova.');
+      showPriceCheck(true, 'OpenAI non ha trovato un prezzo sicuro: avvicina il cartellino e riprova oppure correggi col tastierino.');
+      loadingOcr.style.display = 'none';
+      loadingOcr.textContent = '⏳ Rilevamento in corso...';
+      return;
     }
   } catch(e) {
     console.warn(e);
-    loadingOcr.textContent = '⚠️ OCR online fallito: ' + (e && e.message ? e.message.slice(0, 90) : 'errore') + '. Puoi correggere col tastierino o provo OCR locale...';
+    loadingOcr.textContent = '⚠️ OCR online fallito: ' + (e && e.message ? e.message.slice(0, 90) : 'errore') + '. Correggi col tastierino o riprova.';
+    scanName.value = 'Prodotto';
+    scanPrice.value = '';
+    resetScanQuantity();
+    scanResult.style.display = 'block';
+    return;
   }
 
   await initWorker();
