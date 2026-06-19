@@ -33,7 +33,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 .camera-section { padding: 12px 16px 8px; }
 .video-wrap { position: relative; width: 100%; border-radius: 12px; overflow: hidden; background: #111; }
 #video { width: 100%; border-radius: 12px; background: #111; display: block; max-height: 210px; object-fit: cover; }
-.video-guide { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 25%; height: 74%; border: 2px solid rgba(255,255,255,0.95); border-radius: 14px; box-shadow: 0 0 0 9999px rgba(0,0,0,0.20) inset; pointer-events: none; }
+.video-guide { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 33.33%; height: 74%; border: 2px solid rgba(255,255,255,0.95); border-radius: 14px; box-shadow: 0 0 0 9999px rgba(0,0,0,0.20) inset; pointer-events: none; }
 .video-guide::before, .video-guide::after { content: ''; position: absolute; width: 26px; height: 26px; border-top: 3px solid #1D9E75; top: -2px; }
 .video-guide::before { left: -2px; border-left: 3px solid #1D9E75; border-top-left-radius: 12px; }
 .video-guide::after { right: -2px; border-right: 3px solid #1D9E75; border-top-right-radius: 12px; }
@@ -736,7 +736,7 @@ function looksLikeUnitPrice(words, idx) {
   for (let j = Math.max(0, idx - 5); j <= Math.min(words.length - 1, idx + 5); j++) {
     if (j === idx) continue;
     const t = normalizeOcrToken(words[j].text || '').toLowerCase();
-    if (!/(kg|kilo|lt|l|\/kg|\/l|€/kg|€/l)/.test(t)) continue;
+    if (!/(kg|kilo|lt|l|\/kg|\/l|€\/kg|€\/l)/.test(t)) continue;
     const B = bboxOf(words[j]);
     const dx = Math.max(0, Math.max(base.x0, B.x0) - Math.min(base.x1, B.x1));
     const dy = Math.max(0, Math.max(base.y0, B.y0) - Math.min(base.y1, B.y1));
@@ -879,7 +879,7 @@ function makeCanvasVariant(sourceCanvas, mode) {
 }
 
 // Cornice più stretta: un prezzo grande occupa poco spazio orizzontale.
-const GUIDE_WIDTH_RATIO = 0.25;
+const GUIDE_WIDTH_RATIO = 0.3333;
 const GUIDE_HEIGHT_RATIO = 0.74;
 
 function captureGuideCanvas(sourceCanvas) {
