@@ -33,7 +33,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 .camera-section { padding: 12px 16px 8px; }
 .video-wrap { position: relative; width: 100%; border-radius: 12px; overflow: hidden; background: #111; }
 #video { width: 100%; border-radius: 12px; background: #111; display: block; max-height: 210px; object-fit: cover; }
-.video-guide { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 50%; height: 74%; border: 2px solid rgba(255,255,255,0.95); border-radius: 14px; box-shadow: 0 0 0 9999px rgba(0,0,0,0.20) inset; pointer-events: none; }
+.video-guide { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 70%; height: 74%; border: 2px solid rgba(255,255,255,0.95); border-radius: 14px; box-shadow: 0 0 0 9999px rgba(0,0,0,0.20) inset; pointer-events: none; }
 .video-guide::before, .video-guide::after { content: ''; position: absolute; width: 26px; height: 26px; border-top: 3px solid #1D9E75; top: -2px; }
 .video-guide::before { left: -2px; border-left: 3px solid #1D9E75; border-top-left-radius: 12px; }
 .video-guide::after { right: -2px; border-right: 3px solid #1D9E75; border-top-right-radius: 12px; }
@@ -242,6 +242,7 @@ let cameraStream = null;
 let videoTrack = null;
 let torchOn = false;
 let torchSupported = false;
+const PREFER_NATIVE_PHOTO = /iPhone|iPad|iPod/i.test(navigator.userAgent || '');
 const app = document.getElementById('app');
 const remainingEl = document.getElementById('remaining');
 const spentLabel = document.getElementById('spent-label');
@@ -266,8 +267,22 @@ const STORAGE_KEY = 'ispesa_dati_v1';
 // OCR online OpenAI. Per uso personale puoi inserire qui la tua chiave API.
 // Non condividere questo file se contiene la chiave.
 const USE_OPENAI_OCR = true;
-const OPENAI_API_KEY = ''; // opzionale: inserisci qui una chiave API reale, altrimenti usa OCR locale
+let OPENAI_API_KEY = localStorage.getItem('ispesa_openai_api_key_v1') || ''; // salvata solo localmente sul dispositivo
 const OPENAI_OCR_MODEL = 'gpt-4.1'; // più preciso di gpt-4.1-mini sui cartellini prezzo
+
+function ensureOpenAiApiKey() {
+  if (OPENAI_API_KEY && OPENAI_API_KEY.trim().startsWith('sk-')) return true;
+  const key = prompt('Inserisci la tua API key OpenAI. Verrà salvata solo in questo iPhone dentro il browser. Lascia vuoto per usare OCR locale/manuale.');
+  if (!key || !key.trim()) return false;
+  OPENAI_API_KEY = key.trim();
+  try { localStorage.setItem('ispesa_openai_api_key_v1', OPENAI_API_KEY); } catch(e) {}
+  return true;
+}
+
+function forgetOpenAiApiKey() {
+  OPENAI_API_KEY = '';
+  try { localStorage.removeItem('ispesa_openai_api_key_v1'); } catch(e) {}
+}
 
 function parseMoney(value) {
   if (value === null || value === undefined) return NaN;
@@ -373,18 +388,20 @@ window.removeItem = function(i) {
 function refreshCameraUI() {
   const cameraOn = !!cameraStream;
   const photoLoaded = video.dataset.photoLoaded === '1';
-  cameraToggleBtn.textContent = cameraOn ? '⏹ Camera OFF' : (photoLoaded ? '🔁 Nuova foto' : '📷 Camera ON');
+  cameraToggleBtn.textContent = cameraOn ? '⏹ Camera OFF' : (photoLoaded ? '🔁 Nuova foto' : (PREFER_NATIVE_PHOTO ? '📷 Scatta foto' : '📷 Camera ON'));
   cameraToggleBtn.classList.toggle('off', cameraOn);
   scanBtn.disabled = !cameraOn && !photoLoaded;
   flashBtn.disabled = !cameraOn || !torchSupported;
   flashBtn.classList.toggle('on', torchOn);
   flashBtn.textContent = torchOn ? '🔦 Flash ON' : '🔦 Flash';
-  if (cameraOn && torchSupported) {
+  if (!cameraOn && !photoLoaded && PREFER_NATIVE_PHOTO) {
+    cameraStatus.textContent = 'Su iPhone conviene usare la foto nativa: è più nitida della camera live e legge meglio il prezzo.';
+  } else if (cameraOn && torchSupported) {
     cameraStatus.textContent = 'Fotocamera attiva in alta qualità. Puoi accendere il flash se serve.';
   } else if (cameraOn) {
     cameraStatus.textContent = 'Fotocamera attiva in alta qualità. Flash non supportato da questo browser/dispositivo.';
   } else if (photoLoaded) {
-    cameraStatus.textContent = 'Foto caricata. Premi “Scatta e rileva” per leggere il prezzo.';
+    cameraStatus.textContent = 'Foto caricata. Ora premi “Scatta foto e leggi” per leggere il prezzo.';
   } else {
     cameraStatus.textContent = 'Fotocamera spenta. Avvicina il cartellino: nella cornice deve entrare solo il prezzo grande, non codice a barre o prezzo/kg.';
   }
@@ -422,7 +439,7 @@ async function applyBestCameraSettings(track) {
   // Zoom leggero: spesso aiuta a riempire la cornice con il cartellino.
   // Viene applicato solo se il browser lo supporta.
   if (capabilities.zoom && typeof capabilities.zoom.min === 'number' && typeof capabilities.zoom.max === 'number') {
-    const targetZoom = Math.min(capabilities.zoom.max, Math.max(capabilities.zoom.min, 1.4));
+    const targetZoom = Math.min(capabilities.zoom.max, Math.max(capabilities.zoom.min, 2.0));
     advanced.push({ zoom: targetZoom });
   }
 
@@ -431,7 +448,7 @@ async function applyBestCameraSettings(track) {
   }
 }
 
-function waitForCameraFocus(ms = 650) {
+function waitForCameraFocus(ms = 1200) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
@@ -479,7 +496,15 @@ async function captureStillCanvas() {
 async function startCamera() {
   if (cameraStream) return;
 
-  // Su iPhone, se l'HTML è aperto come file locale o in contesto non sicuro,
+  // Su iPhone preferiamo la foto nativa: di solito è molto più nitida del frame video
+  // e migliora parecchio la lettura del prezzo.
+  if (PREFER_NATIVE_PHOTO) {
+    cameraStatus.textContent = 'Apro la fotocamera nativa: su iPhone legge meglio il prezzo rispetto alla camera live.';
+    cameraFileInput.click();
+    return;
+  }
+
+  // Se l'HTML è aperto come file locale o in contesto non sicuro,
   // getUserMedia può essere bloccato. In quel caso apriamo la fotocamera
   // tramite input capture: è meno “live”, ma funziona anche in molti casi locali.
   if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -848,7 +873,7 @@ function extractPrice(textOrResults) {
 }
 
 function makeCanvasVariant(sourceCanvas, mode) {
-  const maxWidth = 2400;
+  const maxWidth = 3200;
   const scale = sourceCanvas.width < maxWidth ? Math.min(2, maxWidth / sourceCanvas.width) : 1;
   const w = Math.max(1, Math.round(sourceCanvas.width * scale));
   const h = Math.max(1, Math.round(sourceCanvas.height * scale));
@@ -879,7 +904,7 @@ function makeCanvasVariant(sourceCanvas, mode) {
 }
 
 // Cornice più stretta: un prezzo grande occupa poco spazio orizzontale.
-const GUIDE_WIDTH_RATIO = 0.50;
+const GUIDE_WIDTH_RATIO = 0.70;
 const GUIDE_HEIGHT_RATIO = 0.74;
 
 function captureGuideCanvas(sourceCanvas) {
@@ -897,8 +922,8 @@ function captureGuideCanvas(sourceCanvas) {
 
 function captureTightCenterCanvas(sourceCanvas) {
   // Ritaglio più stretto: aiuta quando nel cartellino ci sono anche prezzo/kg, codici o date.
-  const cropW = Math.max(1, Math.round(sourceCanvas.width * 0.72));
-  const cropH = Math.max(1, Math.round(sourceCanvas.height * 0.40));
+  const cropW = Math.max(1, Math.round(sourceCanvas.width * 0.82));
+  const cropH = Math.max(1, Math.round(sourceCanvas.height * 0.48));
   const sx = Math.max(0, Math.round((sourceCanvas.width - cropW) / 2));
   const sy = Math.max(0, Math.round((sourceCanvas.height - cropH) / 2));
   const crop = document.createElement('canvas');
@@ -912,8 +937,7 @@ function buildOcrVariants(sourceCanvas) {
   return [
     { name: 'originale', canvas: makeCanvasVariant(sourceCanvas, 'original') },
     { name: 'contrasto', canvas: makeCanvasVariant(sourceCanvas, 'contrast') },
-    { name: 'soglia', canvas: makeCanvasVariant(sourceCanvas, 'threshold') },
-    { name: 'soglia-invertita', canvas: makeCanvasVariant(sourceCanvas, 'invertThreshold') }
+    { name: 'soglia', canvas: makeCanvasVariant(sourceCanvas, 'threshold') }
   ];
 }
 
@@ -1009,7 +1033,7 @@ document.getElementById('btn-scan').addEventListener('click', async () => {
     canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
   }
   try {
-    if (USE_OPENAI_OCR && OPENAI_API_KEY && OPENAI_API_KEY !== 'INSERISCI_QUI_LA_TUA_API_KEY' && OPENAI_API_KEY !== 'chiave API') {
+    if (USE_OPENAI_OCR && ensureOpenAiApiKey()) {
       loadingOcr.textContent = '⏳ OCR online OpenAI in corso...';
       const guidedCanvasOnline = captureGuideCanvas(canvas);
       const online = await openAiPriceOcr(guidedCanvasOnline, canvas);
@@ -1030,7 +1054,7 @@ document.getElementById('btn-scan').addEventListener('click', async () => {
     }
   } catch(e) {
     console.warn(e);
-    loadingOcr.textContent = '⚠️ OCR online fallito: ' + (e && e.message ? e.message.slice(0, 90) : 'errore') + '. Provo OCR locale...';
+    loadingOcr.textContent = '⚠️ OCR online fallito: ' + (e && e.message ? e.message.slice(0, 90) : 'errore') + '. Puoi correggere col tastierino o provo OCR locale...';
   }
 
   await initWorker();
