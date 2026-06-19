@@ -33,7 +33,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 .camera-section { padding: 12px 16px 8px; }
 .video-wrap { position: relative; width: 100%; border-radius: 12px; overflow: hidden; background: #111; }
 #video { width: 100%; border-radius: 12px; background: #111; display: block; max-height: 210px; object-fit: cover; }
-.video-guide { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 33.33%; height: 74%; border: 2px solid rgba(255,255,255,0.95); border-radius: 14px; box-shadow: 0 0 0 9999px rgba(0,0,0,0.20) inset; pointer-events: none; }
+.video-guide { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 50%; height: 74%; border: 2px solid rgba(255,255,255,0.95); border-radius: 14px; box-shadow: 0 0 0 9999px rgba(0,0,0,0.20) inset; pointer-events: none; }
 .video-guide::before, .video-guide::after { content: ''; position: absolute; width: 26px; height: 26px; border-top: 3px solid #1D9E75; top: -2px; }
 .video-guide::before { left: -2px; border-left: 3px solid #1D9E75; border-top-left-radius: 12px; }
 .video-guide::after { right: -2px; border-right: 3px solid #1D9E75; border-top-right-radius: 12px; }
@@ -577,9 +577,9 @@ async function initWorker() {
     worker = await Tesseract.createWorker('eng');
     if (worker && typeof worker.setParameters === 'function') {
       await worker.setParameters({
-        tessedit_char_whitelist: '0123456789,.€ /KGLkg',
+        tessedit_char_whitelist: '0123456789,.€',
         preserve_interword_spaces: '1',
-        tessedit_pageseg_mode: '11'
+        tessedit_pageseg_mode: '7'
       });
     }
   } catch(e) { worker = null; }
@@ -879,7 +879,7 @@ function makeCanvasVariant(sourceCanvas, mode) {
 }
 
 // Cornice più stretta: un prezzo grande occupa poco spazio orizzontale.
-const GUIDE_WIDTH_RATIO = 0.3333;
+const GUIDE_WIDTH_RATIO = 0.50;
 const GUIDE_HEIGHT_RATIO = 0.74;
 
 function captureGuideCanvas(sourceCanvas) {
@@ -897,8 +897,8 @@ function captureGuideCanvas(sourceCanvas) {
 
 function captureTightCenterCanvas(sourceCanvas) {
   // Ritaglio più stretto: aiuta quando nel cartellino ci sono anche prezzo/kg, codici o date.
-  const cropW = Math.max(1, Math.round(sourceCanvas.width * 0.62));
-  const cropH = Math.max(1, Math.round(sourceCanvas.height * 0.32));
+  const cropW = Math.max(1, Math.round(sourceCanvas.width * 0.72));
+  const cropH = Math.max(1, Math.round(sourceCanvas.height * 0.40));
   const sx = Math.max(0, Math.round((sourceCanvas.width - cropW) / 2));
   const sy = Math.max(0, Math.round((sourceCanvas.height - cropH) / 2));
   const crop = document.createElement('canvas');
@@ -1044,11 +1044,9 @@ document.getElementById('btn-scan').addEventListener('click', async () => {
     const tightCanvas = captureTightCenterCanvas(canvas);
     const guidedVariants = buildOcrVariants(guidedCanvas);
     const tightVariants = buildOcrVariants(tightCanvas);
-    const fullVariants = buildOcrVariants(canvas).slice(0, 1);
     const allVariants = [
       ...tightVariants.map(v => ({ ...v, name: 'prezzo-stretto-' + v.name })),
-      ...guidedVariants.map(v => ({ ...v, name: 'guida-' + v.name })),
-      ...fullVariants.map(v => ({ ...v, name: 'intera-' + v.name }))
+      ...guidedVariants.map(v => ({ ...v, name: 'guida-' + v.name }))
     ];
     const results = [];
     for (let i = 0; i < allVariants.length; i++) {
@@ -1063,7 +1061,7 @@ document.getElementById('btn-scan').addEventListener('click', async () => {
     resetScanQuantity();
     scanResult.style.display = 'block';
     if (p) {
-      showPriceCheck(true, 'Prezzo suggerito dall’OCR: controllalo. Se è sbagliato, usa il tastierino qui sotto.');
+      showPriceCheck(true, 'Prezzo suggerito dall’OCR: controllalo bene. Se è sbagliato, correggilo con il tastierino qui sotto.');
       scanPrice.focus();
       scanPrice.select();
     }
