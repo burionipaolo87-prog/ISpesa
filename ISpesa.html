@@ -33,7 +33,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 .camera-section { padding: 12px 16px 8px; }
 .video-wrap { position: relative; width: 100%; border-radius: 12px; overflow: hidden; background: #111; }
 #video { width: 100%; border-radius: 12px; background: #111; display: block; max-height: 210px; object-fit: cover; }
-.video-guide { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 70%; height: 74%; border: 2px solid rgba(255,255,255,0.95); border-radius: 14px; box-shadow: 0 0 0 9999px rgba(0,0,0,0.20) inset; pointer-events: none; }
+.video-guide { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 80%; height: 74%; border: 2px solid rgba(255,255,255,0.95); border-radius: 14px; box-shadow: 0 0 0 9999px rgba(0,0,0,0.20) inset; pointer-events: none; }
 .video-guide::before, .video-guide::after { content: ''; position: absolute; width: 26px; height: 26px; border-top: 3px solid #1D9E75; top: -2px; }
 .video-guide::before { left: -2px; border-left: 3px solid #1D9E75; border-top-left-radius: 12px; }
 .video-guide::after { right: -2px; border-right: 3px solid #1D9E75; border-top-right-radius: 12px; }
@@ -148,7 +148,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
     <div class="cam-controls">
       <button class="btn-camera" id="btn-camera-toggle">📷 Camera ON</button>
       <button class="btn-flash" id="btn-flash" disabled>🔦 Flash</button>
-      <button class="btn-scan" id="btn-scan" disabled>📸 Scatta foto e leggi</button>
+      <button class="btn-scan" id="btn-scan" disabled>🔎 Leggi prezzo nel box</button>
       <button class="btn-manual-sm" id="btn-manual-add">+ Manuale</button>
     </div>
     <div class="camera-status" id="camera-status">Fotocamera spenta. Attivala solo quando ti serve.</div>
@@ -242,7 +242,7 @@ let cameraStream = null;
 let videoTrack = null;
 let torchOn = false;
 let torchSupported = false;
-const PREFER_NATIVE_PHOTO = /iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+const PREFER_NATIVE_PHOTO = false; // modalità live: legge il frame dentro il box senza aprire la fotocamera nativa
 const app = document.getElementById('app');
 const remainingEl = document.getElementById('remaining');
 const spentLabel = document.getElementById('spent-label');
@@ -388,20 +388,18 @@ window.removeItem = function(i) {
 function refreshCameraUI() {
   const cameraOn = !!cameraStream;
   const photoLoaded = video.dataset.photoLoaded === '1';
-  cameraToggleBtn.textContent = cameraOn ? '⏹ Camera OFF' : (photoLoaded ? '🔁 Nuova foto' : (PREFER_NATIVE_PHOTO ? '📷 Scatta foto' : '📷 Camera ON'));
+  cameraToggleBtn.textContent = cameraOn ? '⏹ Camera OFF' : '📷 Camera ON';
   cameraToggleBtn.classList.toggle('off', cameraOn);
   scanBtn.disabled = !cameraOn && !photoLoaded;
   flashBtn.disabled = !cameraOn || !torchSupported;
   flashBtn.classList.toggle('on', torchOn);
   flashBtn.textContent = torchOn ? '🔦 Flash ON' : '🔦 Flash';
-  if (!cameraOn && !photoLoaded && PREFER_NATIVE_PHOTO) {
-    cameraStatus.textContent = 'Su iPhone conviene usare la foto nativa: è più nitida della camera live e legge meglio il prezzo.';
-  } else if (cameraOn && torchSupported) {
+  if (cameraOn && torchSupported) {
     cameraStatus.textContent = 'Fotocamera attiva in alta qualità. Puoi accendere il flash se serve.';
   } else if (cameraOn) {
     cameraStatus.textContent = 'Fotocamera attiva in alta qualità. Flash non supportato da questo browser/dispositivo.';
   } else if (photoLoaded) {
-    cameraStatus.textContent = 'Foto caricata. Ora premi “Scatta foto e leggi” per leggere il prezzo.';
+    cameraStatus.textContent = 'Foto caricata. Ora premi “Leggi prezzo nel box” per leggere il prezzo.';
   } else {
     cameraStatus.textContent = 'Fotocamera spenta. Avvicina il cartellino: nella cornice deve entrare solo il prezzo grande, non codice a barre o prezzo/kg.';
   }
@@ -473,36 +471,17 @@ async function blobToCanvas(blob) {
 }
 
 async function captureStillCanvas() {
-  // Scatta una foto in MEMORIA, senza salvarla nel rullino/archivio foto.
-  // Se il browser supporta ImageCapture.takePhoto(), usa uno scatto vero a risoluzione più alta.
-  // Altrimenti usa il frame video corrente come fallback.
-  if (cameraStream && videoTrack && typeof ImageCapture !== 'undefined') {
-    try {
-      const imageCapture = new ImageCapture(videoTrack);
-      const blob = await imageCapture.takePhoto();
-      return await blobToCanvas(blob);
-    } catch(e) {
-      console.warn('ImageCapture non disponibile, uso frame video', e);
-    }
-  }
-
+  // Modalità live: NON apre la fotocamera nativa e NON salva foto.
+  // Prende solo il frame attuale del video dentro la pagina e lo manda all'OCR.
   const c = document.createElement('canvas');
   c.width = video.videoWidth || 1280;
   c.height = video.videoHeight || 720;
-  c.getContext('2d').drawImage(video, 0, 0, c.width, c.height);
+  const ctx = c.getContext('2d');
+  ctx.drawImage(video, 0, 0, c.width, c.height);
   return c;
 }
-
 async function startCamera() {
   if (cameraStream) return;
-
-  // Su iPhone preferiamo la foto nativa: di solito è molto più nitida del frame video
-  // e migliora parecchio la lettura del prezzo.
-  if (PREFER_NATIVE_PHOTO) {
-    cameraStatus.textContent = 'Apro la fotocamera nativa: su iPhone legge meglio il prezzo rispetto alla camera live.';
-    cameraFileInput.click();
-    return;
-  }
 
   // Se l'HTML è aperto come file locale o in contesto non sicuro,
   // getUserMedia può essere bloccato. In quel caso apriamo la fotocamera
@@ -657,10 +636,9 @@ async function openAiPriceOcr(sourceCanvas, fullCanvas) {
     throw new Error('Chiave OpenAI non configurata');
   }
 
-  // Inviamo DUE immagini: prima il ritaglio della cornice, poi la foto intera.
-  // Questo evita il problema più comune: la cornice non centra perfettamente il prezzo.
-  const cropImageUrl = makeResizedJpegDataUrl(sourceCanvas, 1800, 0.95);
-  const fullImageUrl = makeResizedJpegDataUrl(fullCanvas || sourceCanvas, 1800, 0.92);
+  // Inviamo SOLO il ritaglio dentro la cornice, così OpenAI non viene confuso
+  // da codici, prezzo/kg o altri numeri fuori dal box.
+  const cropImageUrl = makeResizedJpegDataUrl(sourceCanvas, 2200, 0.96);
 
   const response = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
@@ -677,16 +655,11 @@ async function openAiPriceOcr(sourceCanvas, fullCanvas) {
           content: [
             {
               type: 'input_text',
-              text: 'Sei un lettore di cartellini prezzo da supermercato italiano. Ricevi due immagini dello stesso cartellino: 1) ritaglio centrale, 2) foto intera. Leggi il PREZZO PRINCIPALE DA PAGARE. Restituisci SOLO JSON valido: {"name":"nome prodotto o Prodotto","price":1.23,"confidence":0.0,"seen":"testo/prezzo letto"}. Regole: ignora prezzo al kg o al litro, codici, date, punti fedelta, percentuali di sconto, prezzi barrati e numeri piccoli non associati al prezzo finale. Se vedi 1 e 99 come euro e centesimi, restituisci 1.99. Se non sei sicuro, scegli comunque il prezzo più probabile e abbassa confidence. Usa il punto come separatore decimale.'
+              text: 'Sei un lettore di cartellini prezzo da supermercato italiano. Ricevi SOLO il ritaglio dentro il box verde. Leggi il PREZZO PRINCIPALE grande, cioè il prezzo da pagare. Restituisci SOLO JSON valido: {"name":"Prodotto","price":1.23,"confidence":0.0,"seen":"testo/prezzo letto"}. Regole: ignora prezzo al kg o al litro, codici, date, punti fedelta, percentuali di sconto, prezzi barrati e numeri piccoli. Se vedi 2 e 50 come euro e centesimi, restituisci 2.50. Se vedi 1 e 99, restituisci 1.99. Usa il punto come separatore decimale. Non inventare: se non leggi un prezzo, metti price:null e confidence:0.'
             },
             {
               type: 'input_image',
               image_url: cropImageUrl,
-              detail: 'high'
-            },
-            {
-              type: 'input_image',
-              image_url: fullImageUrl,
               detail: 'high'
             }
           ]
@@ -904,7 +877,7 @@ function makeCanvasVariant(sourceCanvas, mode) {
 }
 
 // Cornice più stretta: un prezzo grande occupa poco spazio orizzontale.
-const GUIDE_WIDTH_RATIO = 0.70;
+const GUIDE_WIDTH_RATIO = 0.80;
 const GUIDE_HEIGHT_RATIO = 0.74;
 
 function captureGuideCanvas(sourceCanvas) {
@@ -1010,13 +983,13 @@ cameraToggleBtn.addEventListener('click', toggleCamera);
 flashBtn.addEventListener('click', toggleFlash);
 
 document.getElementById('btn-scan').addEventListener('click', async () => {
-  if (!cameraStream && video.dataset.photoLoaded !== '1') { alert('Attiva la fotocamera, scatta una foto del prezzo oppure usa il tasto + Manuale.'); return; }
+  if (!cameraStream && video.dataset.photoLoaded !== '1') { alert('Attiva la fotocamera live oppure usa il tasto + Manuale.'); return; }
   loadingOcr.style.display = 'block';
   loadingOcr.textContent = '⏳ Rilevamento in corso...';
   scanResult.style.display = 'none';
   if (cameraStream) {
-    loadingOcr.textContent = '⏳ Scatto foto ad alta qualità...';
-    await waitForCameraFocus(900);
+    loadingOcr.textContent = '⏳ Leggo il riquadro e invio a OpenAI...';
+    await waitForCameraFocus(350);
     const stillCanvas = await captureStillCanvas();
     canvas.width = stillCanvas.width;
     canvas.height = stillCanvas.height;
