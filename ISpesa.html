@@ -811,9 +811,7 @@ Se il prezzo sembra ambiguo tra 3 e 8, scegli quello che visivamente corrisponde
 
   let parsed = {};
   try { parsed = parseJsonFromModelText(text); } catch(e) { parsed = { seen: text }; }
-  let price = parsed.price === null || parsed.price === undefined ? null : Number(String(parsed.price).replace(',', '.').replace(/[^	
-
- 0-9.\-]/g, ''));
+  let price = parsed.price === null || parsed.price === undefined ? null : Number(String(parsed.price).replace(',', '.').replace(/[^0-9.\-]/g, ''));
 
   // Recupero di sicurezza: solo se il JSON non contiene un prezzo valido.
   // Cerca prima prezzi con separatore, poi formato euro/centesimi separati.
