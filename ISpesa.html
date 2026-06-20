@@ -57,7 +57,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 .camera-status { font-size: 12px; color: #888; text-align: center; padding: 7px 4px 0; line-height: 1.35; }
 
 #loading-ocr { display: none; font-size: 13px; color: #888; text-align: center; padding: 8px 0 4px; }
-.ocr-preview { display:none; margin: 8px 16px; background:#FBF7FF; border:1px solid rgba(0,0,0,0.10); border-radius:12px; padding:10px; }
+.ocr-preview { display:none !important; margin: 8px 16px; background:#FBF7FF; border:1px solid rgba(0,0,0,0.10); border-radius:12px; padding:10px; }
 .ocr-preview-title { font-size:12px; color:#666; font-weight:700; margin-bottom:7px; text-align:center; }
 .ocr-preview img { display:block; width:100%; max-height:210px; object-fit:contain; background:#111; border-radius:8px; border:1px solid rgba(0,0,0,0.10); }
 .ocr-preview-note { font-size:11px; color:#888; text-align:center; margin-top:6px; line-height:1.35; }
@@ -146,14 +146,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
         <div class="video-guide-bottom-left"></div>
         <div class="video-guide-bottom-right"></div>
       </div>
-      <div class="guide-label">Metti SOLO il prezzo</div>
+      <div class="guide-label">Metti SOLO nome e prezzo</div>
     </div>
     <canvas id="canvas"></canvas>
     <input id="camera-file-input" type="file" accept="image/*" capture="environment" style="display:none;">
     <div class="cam-controls">
       <button class="btn-camera" id="btn-camera-toggle">📷 Camera ON</button>
       <button class="btn-flash" id="btn-flash" disabled>🔦 Flash</button>
-      <button class="btn-scan" id="btn-scan" disabled>🔎 Leggi SOLO il prezzo</button>
+      <button class="btn-scan" id="btn-scan" disabled>🔎 Leggi nome e prezzo</button>
       <button class="btn-manual-sm" id="btn-manual-add">+ Manuale</button>
     </div>
     <div class="camera-status" id="camera-status">Fotocamera spenta. Attivala solo quando ti serve.</div>
@@ -411,9 +411,9 @@ function refreshCameraUI() {
   } else if (cameraOn) {
     cameraStatus.textContent = 'Fotocamera attiva in alta qualità. Flash non supportato da questo browser/dispositivo.';
   } else if (photoLoaded) {
-    cameraStatus.textContent = 'Foto caricata. Ora premi “Leggi prezzo nel box” per leggere il prezzo.';
+    cameraStatus.textContent = 'Foto caricata. Ora premi “Leggi nome e prezzo” per leggere entrambi.';
   } else {
-    cameraStatus.textContent = 'Fotocamera spenta. Avvicina il cartellino: nella cornice deve entrare solo il prezzo grande, non codice a barre o prezzo/kg.';
+    cameraStatus.textContent = 'Fotocamera spenta. Avvicina il cartellino: nella cornice devono entrare il nome prodotto e il prezzo principale, evitando codici, barcode e altri dettagli.';
   }
 }
 
@@ -515,7 +515,7 @@ async function startCamera() {
   // getUserMedia può essere bloccato. In quel caso apriamo la fotocamera
   // tramite input capture: è meno “live”, ma funziona anche in molti casi locali.
   if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    cameraStatus.textContent = 'Camera live non disponibile qui. Scatta una foto del prezzo.';
+    cameraStatus.textContent = 'Camera live non disponibile qui. Scatta una foto del cartellino con nome e prezzo.';
     cameraFileInput.click();
     return;
   }
@@ -555,7 +555,7 @@ async function startCamera() {
     torchSupported = false;
     video.srcObject = null;
     video.style.display = 'block';
-    cameraStatus.textContent = 'Permesso camera negato o camera live bloccata. Scatta una foto del prezzo.';
+    cameraStatus.textContent = 'Permesso camera negato o camera live bloccata. Scatta una foto del cartellino con nome e prezzo.';
     refreshCameraUI();
     setTimeout(() => cameraFileInput.click(), 150);
   }
@@ -691,19 +691,28 @@ async function openAiPriceOcr(sourceCanvas, fullCanvas) {
   const cropContrastImageUrl = makeHighContrastJpegDataUrl(sourceCanvas, 3000, 0.98);
 
   const promptText = `
-Sei un lettore VISIVO di prezzi da supermercato. Nell'immagine c'è UN SOLO prezzo inquadrato nel box verde.
-Devi leggere SOLO il prezzo finale grande visibile nel ritaglio.
+Sei un lettore VISIVO di cartellini e volantini del supermercato. Nel ritaglio c'è UN SOLO prodotto inquadrato con il suo nome e il suo prezzo principale.
+Devi leggere DUE cose e soltanto queste:
+1) il nome del prodotto
+2) il prezzo finale principale
 
 Rispondi SOLO con JSON valido, senza testo fuori dal JSON:
-{"name":"Prodotto","price":1.23,"confidence":0.0,"seen":"prezzo letto"}
+{"name":"Nome prodotto","price":1.23,"confidence":0.0,"seen":"nome | prezzo"}
 
-REGOLE ASSOLUTE:
+REGOLE ASSOLUTE SUL NOME:
+- Estrai il nome principale del prodotto in modo breve e pulito.
+- Mantieni il nome del prodotto o della categoria principale: esempi "Funghi Champignon sfusi", "Cracker Salati", "Milk Pearl Corn", "Prosciutto di Parma DOP", "Latte Parzialmente Scremato UHT".
+- Puoi includere una variante utile del prodotto se fa parte del nome principale.
+- Non inserire nel nome: sconti, percentuali, date, origine, peso, unità, grammi, codici, barcode, QR, marchi promozionali, "offerta", "quantità limitata", "prezzo normale", "tasto".
+- Se il nome non è chiaramente leggibile, usa name:"Prodotto".
+
+REGOLE ASSOLUTE SUL PREZZO:
 - Non scegliere il primo numero: scegli il prezzo più grande/evidente nel ritaglio.
 - Non inventare: se il prezzo non è chiaramente leggibile, usa price:null.
 - Usa sempre il punto come separatore decimale.
 - Se vedi un prezzo scritto con virgola, trasformalo in punto: 2,89 => 2.89.
 - Se vedi euro e centesimi separati, uniscili: 1 15 => 1.15, 6 90 => 6.90, 12 89 => 12.89.
-- Se vedi solo tre cifre grandi senza separatore, trattale come euro+centesimi: 115 => 1.15, 519 => 5.19.
+- Se vedi solo tre o quattro cifre grandi senza separatore, trattale come euro+centesimi: 115 => 1.15, 519 => 5.19, 1289 => 12.89.
 - Se il prezzo è 0,89 o ,89, restituisci 0.89.
 - Il prezzo principale può essere rosso, nero, grande, con € vicino/sotto, o con “€/kg”: se è il numero grande principale, è il prezzo.
 
@@ -712,22 +721,17 @@ SCARTA SEMPRE:
 - date, punti, codici, barcode, QR
 - grammature e quantità: 100g, 150g, 700g, 6x1L, kg, lt
 - prezzi piccoli barrati o vecchi se c'è un prezzo grande principale
-- parole come offerta, quantità limitata, tasto, prezzo normale
+- parole o riquadri come offerta, quantità limitata, tasto, prezzo normale, prezzo vecchio, origine, specificazioni
 
 ESEMPI DA RICONOSCERE:
-- 1,15 / 1 15 / 115 grande => 1.15
-- 1,55 / 1 55 / 155 grande => 1.55
-- 1,99 / 1 99 / 199 grande => 1.99
-- 2,29 / 2 29 / 229 grande => 2.29
-- 2,59 / 2 59 / 259 grande => 2.59
-- 3,99 / 3 99 / 399 grande => 3.99
-- 4,99 / 4 99 / 499 grande => 4.99
-- 5,19 / 5 19 / 519 grande => 5.19
-- 5,69 / 5 69 / 569 grande => 5.69
-- 12,89 / 12 89 / 1289 grande => 12.89
-- 0,89 / 0 89 / 089 grande => 0.89
-- Cartellino Eurospin con prezzo rosso grande e prezzo piccolo barrato: restituisci il prezzo rosso grande.
+- "Funghi Champignon sfusi" + 2,68 => name:"Funghi Champignon sfusi", price:2.68
+- "CRACKER SALATI" + 1 35 => name:"Cracker Salati", price:1.35
+- "Milk Pearl Corn (Single Pack)" + 6 90 => name:"Milk Pearl Corn", price:6.90
+- "Latte parzialmente scremato UHT" + 4,99 => name:"Latte Parzialmente Scremato UHT", price:4.99
+- "Prosciutto di Parma DOP" + 2,29 => name:"Prosciutto di Parma DOP", price:2.29
+- "Yogurt intero alla frutta" + 1,99 => name:"Yogurt Intero alla Frutta", price:1.99
 
+Se nel ritaglio ci sono più testi, scegli come nome il titolo del prodotto più vicino al prezzo principale.
 Se nel ritaglio ci sono più prezzi, scegli quello più centrale e più grande.
 Se il prezzo sembra ambiguo tra 3 e 8, scegli quello che visivamente corrisponde meglio alla forma della cifra, non correggere a caso.`.trim();
 
@@ -807,7 +811,9 @@ Se il prezzo sembra ambiguo tra 3 e 8, scegli quello che visivamente corrisponde
 
   let parsed = {};
   try { parsed = parseJsonFromModelText(text); } catch(e) { parsed = { seen: text }; }
-  let price = parsed.price === null || parsed.price === undefined ? null : Number(String(parsed.price).replace(',', '.').replace(/[^0-9.\-]/g, ''));
+  let price = parsed.price === null || parsed.price === undefined ? null : Number(String(parsed.price).replace(',', '.').replace(/[^	
+
+ 0-9.\-]/g, ''));
 
   // Recupero di sicurezza: solo se il JSON non contiene un prezzo valido.
   // Cerca prima prezzi con separatore, poi formato euro/centesimi separati.
@@ -1019,13 +1025,7 @@ function makeCanvasVariant(sourceCanvas, mode) {
 const GUIDE_WIDTH_RATIO = 0.96;
 const GUIDE_HEIGHT_RATIO = 0.86;
 
-function showOcrCropPreview(sourceCanvas) {
-  try {
-    const url = makeResizedJpegDataUrl(sourceCanvas, 1600, 0.96);
-    if (ocrPreviewImg) ocrPreviewImg.src = url;
-    if (ocrPreview) ocrPreview.style.display = 'block';
-  } catch(e) {}
-}
+function showOcrCropPreview(sourceCanvas) { return; }
 
 function captureGuideCanvas(sourceCanvas) {
   const cropW = Math.max(1, Math.round(sourceCanvas.width * GUIDE_WIDTH_RATIO));
@@ -1136,7 +1136,7 @@ document.getElementById('btn-scan').addEventListener('click', async () => {
   scanResult.style.display = 'none';
   if (ocrPreview) ocrPreview.style.display = 'none';
   if (cameraStream) {
-    loadingOcr.textContent = '⏳ Leggo esattamente il box verde e invio a OpenAI...';
+    loadingOcr.textContent = '⏳ Leggo esattamente nome e prezzo nel box verde e invio a OpenAI...';
     await waitForCameraFocus(900);
     const stillCanvas = await captureStillCanvas();
     canvas.width = stillCanvas.width;
@@ -1164,7 +1164,7 @@ document.getElementById('btn-scan').addEventListener('click', async () => {
       return;
     }
     {
-      loadingOcr.textContent = '⏳ Invio SOLO il ritaglio del box a OpenAI...';
+      loadingOcr.textContent = '⏳ Invio a OpenAI solo il ritaglio con nome e prezzo...';
       const guidedCanvasOnline = captureGuideCanvas(canvas);
       showOcrCropPreview(guidedCanvasOnline);
       const online = await openAiPriceOcr(guidedCanvasOnline, null);
@@ -1174,14 +1174,14 @@ document.getElementById('btn-scan').addEventListener('click', async () => {
       scanResult.style.display = 'block';
       if (online.price) {
         const conf = online.confidence ? ' Affidabilità stimata: ' + Math.round(online.confidence * 100) + '%.' : '';
-        showPriceCheck(true, 'Prezzo suggerito dall’OCR online: controllalo prima di aggiungere.' + conf + (online.seen ? ' Letto: ' + online.seen : ''));
+        showPriceCheck(true, 'Nome e prezzo suggeriti dall’OCR online: controllali prima di aggiungere.' + conf + (online.seen ? ' Letto: ' + online.seen : ''));
         loadingOcr.style.display = 'none';
         loadingOcr.textContent = '⏳ Rilevamento in corso...';
         scanPrice.focus();
         scanPrice.select();
         return;
       }
-      showPriceCheck(true, 'OpenAI non ha trovato un prezzo sicuro. Guarda l’anteprima sopra: deve vedersi solo il prezzo grande. Se il prezzo si vede bene, correggilo col tastierino e mandami uno screenshot dell’anteprima.');
+      showPriceCheck(true, 'OpenAI non ha trovato con sicurezza nome e prezzo. Riprova centrando meglio il cartellino oppure correggi manualmente i campi.');
       loadingOcr.style.display = 'none';
       loadingOcr.textContent = '⏳ Rilevamento in corso...';
       return;
@@ -1229,7 +1229,7 @@ document.getElementById('btn-scan').addEventListener('click', async () => {
       scanPrice.select();
     }
     if (!p) {
-      loadingOcr.textContent = '⚠️ Prezzo non trovato: centra il cartellino nella cornice o usa + Manuale';
+      loadingOcr.textContent = '⚠️ Nome o prezzo non trovati: centra meglio il cartellino nella cornice o usa + Manuale';
       setTimeout(() => { loadingOcr.style.display = 'none'; loadingOcr.textContent = '⏳ Rilevamento in corso...'; }, 1800);
       return;
     }
